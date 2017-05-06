@@ -2,14 +2,17 @@ package main
 
 import (
 	"fmt"
+//	"/node"
 	"github.com/prakhar0409/Distributed-Ledger/node"
 )
 
 func main(){
-	var num_nodes = 10
+	num_nodes := 10
+	var node_list [1000]node.Node
+	_ = node_list[1]
+	fmt.Printf("node list inited\n")
 	quit := make(chan int)
 	fmt.Printf("Simulator Started\n")
-
 
 	for i:=0;i<num_nodes;i++{
 		go node.Run(i,quit)
