@@ -15,9 +15,12 @@ package node
  11 -> global abort
 */
 type Message struct{
-	msgtype int
-	srcid int
-	destid int
+	msgtype string
+	src Node
+	dest Node
+
+	//2-phase commit shit
+	txn Transaction
 
 	//  join request => type = 1 
 	join_nodeid int

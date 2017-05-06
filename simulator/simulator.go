@@ -2,22 +2,39 @@ package main
 
 import (
 	"fmt"
-//	"/node"
+	"os"
+	"strconv"
 	"github.com/prakhar0409/Distributed-Ledger/node"
 )
 
-func main(){
-	num_nodes := 10
-	var node_list [1000]node.Node
-	_ = node_list[1]
-	fmt.Printf("node list inited\n")
-	quit := make(chan int)
-	fmt.Printf("Simulator Started\n")
 
-	for i:=0;i<num_nodes;i++{
-		go node.Run(i,quit)
+
+func main(){
+	if len(os.Args) != 2 {
+		fmt.Println("Usage: go run simulator.go <num_nodes>")
+		return
+	}
+	
+	maxTxns := 1000
+	num_nodes, err := strconv.Atoi(os.Args[1])
+    if err != nil  {
+        fmt.Println("Panic: Incorrect arguments")
+        return
+    }
+
+    node_list := make([]node.Node, num_nodes)
+   	quit := make(chan int)
+	for i := 0; i < num_nodes; i++ {
+		node_list[i].Initialize(i,node_list,maxTxns,quit);
+		// fmt.Println(node_list[i].nodeid);	//cant refer to unexported field or method
 	}
 
+	for i := 0; i < num_nodes; i++ {
+		go node_list[i].Run();
+	}
+
+
+	//channel for quitting
 	num_quits := 0
 	ok := false
 	for{
@@ -27,5 +44,5 @@ func main(){
 			break
 		}
 	}
-	fmt.Printf("Ending Simulations\n")
+    // <- quit
 }

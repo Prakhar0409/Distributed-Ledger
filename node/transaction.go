@@ -1,10 +1,15 @@
 package node
 
 
-//src id pays dest_id money = amt, the moderating third party is modid
+//src id pays dest_id money = amt, the moderating third party is modid/mod
 type Transaction struct{
-	srcid int
-	destid int
+	txnid int		//make this unique 
+	src Node
+	dest Node
 	amt int
-	modid int
+	mod Node
+
+	//num-replies received by the src.
+	num_replies int
+	aborted bool
 }
