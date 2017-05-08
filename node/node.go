@@ -24,6 +24,9 @@ type Node struct {
 	commit_logs map[int]*Log 			// txnid -> Log
 	max_accepted int
 	maxTxns int
+	recvd_t [][]int
+	recvd_n [][]int
+	totalsize int
 	//set of txns pending to be broadcast
 	// simulator Simulator
 }
@@ -44,6 +47,16 @@ func (n *Node) Initialize(nodeid int, list []Node, maxTxns int, quit chan int){
 	n.pending_commits = make(map[int]*Log)
 	n.commit_logs = make(map[int]*Log)
 	n.maxTxns = maxTxns
+	nodesize :=len(list)
+	n.totalsize = nodesize
+	n.recvd_t = make([][]int,nodesize)
+	for i:=range n.recvd_t {
+		n.recvd_t[i] = make([]int,nodesize)
+	}
+	n.recvd_n = make([][]int,nodesize)
+	for i:=range n.recvd_n {
+		n.recvd_n[i] = make([]int,nodesize)
+	}
 }
 
 func (n *Node) Run() {
@@ -67,7 +80,15 @@ func (n *Node) Run() {
 			n.no_die++
 			n.doTransaction()
 		}
-
+		
+		gossip:=rand.Intn(100000)
+		if gossip < 1{
+			k := rand.Intn(n.totalsize)
+			if(n.node_list[k].Live==1 && k!=n.nodeid){
+				msg := Message{msgtype: "gossip_share", src: n, dest: &n.node_list[k], rcvd_t : n.recvd_t ,rcvd_n : n.recvd_n}
+				n.node_list[k].messageQ <- msg
+			}
+		}
 		//check if for any pending transaction - you wait for more than 1,00,00,000 iterations. send a global abort
 		for tid, txn := range n.pending_txns {
 			txn.waiting_time++
@@ -280,8 +301,25 @@ func (n *Node) Run() {
 					
 					// Update the nodelist accordingly
 				}else if msg.msgtype =="request_msg_flushed"{
+					
 					// Update that msg update from that node
 				}else if msg.msgtype =="gossip_share"{
+				fmt.Printf("[Gossip_share] nodeid: %d    from: %d\n", n.nodeid,msg.src.nodeid)
+					for i := 0; i<n.totalsize; i++ {
+						if(n.node_list[i].Live==0){
+							continue
+						}
+						for j := 0; j<n.totalsize; j++{
+							if(n.node_list[j].Live==0){
+							continue
+						}
+							if(msg.rcvd_t[i][j]>n.recvd_t[i][j]){
+								n.recvd_t[i][j] = msg.rcvd_t[i][j]
+							}else if(msg.rcvd_t[i][j]==n.recvd_t[i][j] && msg.rcvd_n[i][j] >n.recvd_n[i][j] ){
+								n.recvd_n[i][j] = msg.rcvd_n[i][j]
+							}
+						}
+					}
 					// Share your matrix with someone else.
 				}else if msg.msgtype =="msg_deliverd" {
 					
