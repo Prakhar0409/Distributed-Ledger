@@ -15,7 +15,9 @@ type Node struct {
 	Live int
 	txn_num int
 	pending_txns map[int]*Transaction		//pending to be committed
-	pending_broadcast map[int]bool			//set of txns pending to be broadcast
+	pending_broadcast map[int]bool
+	max_accepted int
+	//set of txns pending to be broadcast
 	// simulator Simulator
 }
 
@@ -38,16 +40,16 @@ func (n *Node) Run() {
 	//infinite loop
 	for{		
 
-		//die with random probability say 2 in 10,000
-		// die := rand.Intn(10000)
-		// if die <= 1 {
-		// 	fmt.Println("DIE: from node:",n.nodeid)
-		// 	n.Live = 0
-		// 	break
-		// }
+		//die with random probability say 2 in 10,0000
+		die := rand.Intn(1000000)
+		if die < 1 {
+			fmt.Println("DIE: from node:",n.nodeid)
+			n.Live = 0
+			break
+		}
 
-		//do a transaction with random probability say 1 in 100
-		transact := rand.Intn(100)
+		//do a transaction with random probability say 1 in 10000
+		transact := rand.Intn(10000)
 		if transact < 1 {
 			n.doTransaction()
 		}
@@ -70,12 +72,10 @@ func (n *Node) Run() {
 			        fmt.Printf("[VOTE_COMMIT recv] nodeid: %d txnid: %d  from: %d\n", n.nodeid,msg.txn.txnid,msg.src.nodeid)
 		            msg.txn.num_replies++
 		            if msg.txn.num_replies >= 2{
-						fmt.Println("ERROR COMING BRO");
 						txn := msg.txn 						//copying a pointer
 						fmt.Println("[TYPE POINTER OR TXN]", reflect.TypeOf(txn))
 
 			            txn.num_replies = 0
-			           	fmt.Println("TUNTUTUNTUTNUNTUNTUNT");
 
 			            delete(n.pending_txns,txn.txnid) 	//remove from my pending txns
 			            msgtype := "global_abort" 
@@ -86,7 +86,6 @@ func (n *Node) Run() {
 						}	
 						txn.dest.messageQ <- Message{msgtype: msgtype, src: n, dest:txn.dest, txn:txn}
 						txn.mod.messageQ <- Message{msgtype: msgtype, src: n, dest:txn.mod, txn:txn}
-						fmt.Println("ERROR DIDNT COME");
 		            }
 		        } else if msg.msgtype == "vote_abort" {
 			        fmt.Printf("[VOTE_ABORT recv] nodeid: %d txnid: %d  from: %d\n", n.nodeid,msg.txn.txnid,msg.src.nodeid)
@@ -112,8 +111,55 @@ func (n *Node) Run() {
 						delete(n.pending_txns,msg.txn.txnid) //remove from my pending txns
 		            }
 		            //do nothing more. wait for the main guy to broadcast
-		        }
-
+		        }else if msg.msgtype == "request_event_log"{
+					accept1:=true
+					
+					fmt.Printf("[Request_for_logging_event_recv] nodeid: %d  txnid: %d  from: %d\n", n.nodeid,msg.txn.txnid,msg.src.nodeid)
+					for i, v := range n.pending_broadcast {
+						if(v){
+						if(i < msg.txn.txnid ){
+							accept1 = false
+							break
+						}
+						if(i == msg.txn.txnid && n.nodeid < msg.src.nodeid ){
+							accept1 = false
+							break
+						}
+						}
+					}
+					if(accept1){
+						msg.src.messageQ <- Message{msgtype: "ack_event_log", src: n, dest: msg.src, txn:msg.txn}
+					}else{
+						n.messageQ <-msg
+					}
+				}else if msg.msgtype == "ack_event_log"{
+					fmt.Printf("[Ack_for_logging_event_recv] nodeid: %d  txnid: %d  from: %d\n", n.nodeid,msg.txn.txnid,msg.src.nodeid)
+					// Check if recieved by all
+					
+				}else if msg.msgtype == "request_commit_log"{
+					fmt.Printf("[Request_for_commiting_event_recv] nodeid: %d  txnid: %d  from: %d\n", n.nodeid,msg.txn.txnid,msg.src.nodeid)
+					//Commit the log
+					
+					
+					// Send ack to the main node
+					msg.src.messageQ <- Message{msgtype: "ack_commit_log", src: n, dest: msg.src, txn:msg.txn}
+					
+				}else if msg.msgtype == "ack_commit_log"{
+					fmt.Printf("[Ack_for_commiting_event_recv] nodeid: %d  txnid: %d  from: %d\n", n.nodeid,msg.txn.txnid,msg.src.nodeid)
+					// Check if recieved by all
+					
+					// Remove from pending broadcast if recieved by all
+					
+				}else if msg.msgtype == "view_change"{
+					
+					// Update the nodelist accordingly
+				}else if msg.msgtype =="request_msg_flushed"{
+					// Update that msg update from that node
+				}else if msg.msgtype =="gossip_share"{
+					// Share your matrix with someone else.
+				}else if msg.msgtype =="msg_deliverd" {
+					
+				}
 	    	default:
 				continue
 		}

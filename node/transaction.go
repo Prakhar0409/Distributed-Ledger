@@ -14,3 +14,9 @@ type Transaction struct{
 	num_replies int
 	aborted bool
 }
+
+type Log struct {
+	txn Transaction
+	state string
+	
+}
