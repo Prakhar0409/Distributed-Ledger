@@ -29,6 +29,7 @@ type Message struct{
 	rcvd_n [][]int
 	nnode int
 	count int
+
 	// join accept => type = 2
 		//todo - send the src's ledger - idk
 

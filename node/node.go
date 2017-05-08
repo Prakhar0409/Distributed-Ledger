@@ -237,7 +237,7 @@ func (n *Node) Run() {
 						
 						msg.src.messageQ <- Message{msgtype: "ack_event_log", src: n, dest: msg.src, txn:msg.txn}
 					}else{
-						fmt.Printf("Denying ack from nodeid:%d txnid: %d myself: %d\n",msg.src.nodeid,msg.txn.txnid,n.nodeid)
+						//fmt.Printf("Denying ack from nodeid:%d txnid: %d myself: %d\n",msg.src.nodeid,msg.txn.txnid,n.nodeid)
 						n.messageQ <- msg
 					}
 				} else if msg.msgtype == "ack_event_log"{
@@ -332,6 +332,8 @@ func (n *Node) Run() {
 					fmt.Printf("[Msg Flushed] nodeid: %d    from: %d\n", n.nodeid,msg.src.nodeid)
 					n.recvd_t[n.nodeid][msg.nnode] = msg.count
 					msg.src.messageQ <- Message{msgtype: "msg_deliverd", src: n, dest: &n.node_list[msg.src.nodeid],nnode:msg.nnode,count:msg.count }
+
+					
 					// Update that msg update from that node
 				}else if msg.msgtype =="gossip_share"{
 				fmt.Printf("[Gossip_share] nodeid: %d    from: %d\n", n.nodeid,msg.src.nodeid)
