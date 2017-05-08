@@ -266,6 +266,11 @@ func (n *Node) Run() {
 					n.txn_list[n.ledger_entrynum] = *(msg.txn)
 					n.ledger_entrynum++;
 					// Send ack to the main node
+					if(msg.txn.txnid > n.recvd_t[n.nodeid][n.nodeid]){
+							n.recvd_t[n.nodeid][n.nodeid]= msg.txn.txnid
+						}else if(n.recvd_t[n.nodeid][n.nodeid] == msg.txn.txnid  && n.recvd_n[n.nodeid][n.nodeid] > msg.src.nodeid){
+							n.recvd_n[n.nodeid][n.nodeid] = msg.src.nodeid
+						}
 					msg.src.messageQ <- Message{msgtype: "ack_commit_log", src: n, dest: msg.src, txn:msg.txn}
 					
 				} else if msg.msgtype == "ack_commit_log" {
@@ -290,6 +295,9 @@ func (n *Node) Run() {
 					if(committed){
 						fmt.Printf("[ALL_ACKS_FOR_COMMITING] nodeid: %d  txnid: %d \n", n.nodeid, msg.txn.txnid)
 						//delete from pending_broadcast only if all have replied committed
+						if(msg.txn.txnid > n.recvd_t[n.nodeid][n.nodeid]){
+							n.recvd_t[n.nodeid][n.nodeid]= msg.txn.txnid
+						}
 						delete(n.pending_broadcast,msg.txn.txnid)
 						delete(n.commit_logs,msg.txn.txnid)
 						delete(n.pending_logs,msg.txn.txnid)
