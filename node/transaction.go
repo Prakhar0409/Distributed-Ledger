@@ -18,5 +18,5 @@ type Transaction struct{
 type Log struct {
 	txn Transaction
 	state string
-	
+	nodes_recieved map[int]bool
 }
