@@ -53,7 +53,7 @@ func main(){
 				goto end
 			}
 		default:
-			// num_iters++
+			// num_iters++				//uncomment this to allow simulator to quit after sometime
 			if(num_iters > 1000000000){
 				for i :=0; i<num_nodes;i++{
 					node_list[i].Live = 0
