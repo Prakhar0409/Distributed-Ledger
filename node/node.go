@@ -24,11 +24,12 @@ type Node struct {
 	commit_logs map[int]*Log 			// txnid -> Log
 	max_accepted int
 	maxTxns int
+	quitsim chan int 					//if simulator calls quit
 	//set of txns pending to be broadcast
 	// simulator Simulator
 }
 
-func (n *Node) Initialize(nodeid int, list []Node, maxTxns int, quit chan int){
+func (n *Node) Initialize(nodeid int, list []Node, maxTxns int, quit chan int,quitsim chan int){
 	n.nodeid = nodeid
 	n.node_list = list
 	n.messageQ = make(chan Message, 10000)
@@ -44,6 +45,7 @@ func (n *Node) Initialize(nodeid int, list []Node, maxTxns int, quit chan int){
 	n.pending_commits = make(map[int]*Log)
 	n.commit_logs = make(map[int]*Log)
 	n.maxTxns = maxTxns
+	n.quitsim = quitsim
 }
 
 func (n *Node) Run() {
@@ -53,10 +55,14 @@ func (n *Node) Run() {
 	//infinite loop
 	for{		
 
+		if(n.Live == 0){
+			fmt.Println("[DIE] from node:",n.nodeid)
+			break
+		}
 		//die with random probability say 2 in 10,0000
 		die := rand.Intn(1000000)
 		if die < 1 && n.no_die == 0 {
-			fmt.Println("DIE: from node:",n.nodeid)
+			fmt.Println("[DIE] from node:",n.nodeid)
 			n.Live = 0
 			break
 		}
@@ -286,8 +292,9 @@ func (n *Node) Run() {
 				}else if msg.msgtype =="msg_deliverd" {
 					
 				}
+
 	    	default:
-				continue
+				
 		}
 
 		//check and broadcast the txn
@@ -325,6 +332,7 @@ func (n *Node) Run() {
 	defer f.Close()
 
 	//send a exiting signal
+	// fmt.Printf("node %d quiting", n.nodeid)
 	n.quit <- 1
 }
 
