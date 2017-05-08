@@ -37,7 +37,7 @@ for i in range(1,num_nodes):
                         sys.exit()
 		
 print("Node "+str(longest)+" has longest txn")
-print("Wink! Wink wink!! That ends semester for you babes ;)")
+print("Wink! Wink wink!! That ends the semester for you babes ;)")
 
 
 

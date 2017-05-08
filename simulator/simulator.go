@@ -27,8 +27,9 @@ func main(){
     fmt.Println(reflect.TypeOf(node_list))
 
    	quit := make(chan int)										//pointer to channel
+   	quitsim := make(chan int)
 	for i := 0; i < num_nodes; i++ {
-		node_list[i].Initialize(i,node_list,maxTxns,quit);		//array, channel, maps are pointers
+		node_list[i].Initialize(i,node_list,maxTxns,quit,quitsim);		//array, channel, maps are pointers
 		// fmt.Println(node_list[i].nodeid);	//cant refer to unexported field or method
 	}
 
@@ -38,14 +39,29 @@ func main(){
 
 
 	//channel for quitting
+	num_iters := 0
 	num_quits := 0
 	ok := false
 	for{
-		_,ok = <-quit
-		num_quits++
-		if ok && num_quits >= num_nodes{
-			break
+		select {
+		case _,ok = <-quit:
+			if ok {
+				// fmt.Println("gjg");
+				num_quits++
+			}
+			if num_quits >= num_nodes{
+				goto end
+			}
+		default:
+			// num_iters++
+			if(num_iters > 1000000000){
+				for i :=0; i<num_nodes;i++{
+					node_list[i].Live = 0
+				}				
+			}
 		}
 	}
+	end:
+		fmt.Println("Simulator Exiting:)")
     // <- quit
 }
