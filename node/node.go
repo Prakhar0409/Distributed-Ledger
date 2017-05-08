@@ -16,7 +16,7 @@ type Node struct {
 	no_die int 							//this guy is the co-ordinator and cannot die
 	txn_num int
 	pending_txns map[int]*Transaction		//pending to be committed
-	pending_broadcast map[int]bool
+	pending_broadcast map[int]*Transaction
 	pending_logs map[int]*Log
 	pending_commits map[int]*Log 			// txnid -> Log
 	commit_logs map[int]*Log 			// txnid -> Log
@@ -35,7 +35,7 @@ func (n *Node) Initialize(nodeid int, list []Node, maxTxns int, quit chan int){
 	n.Live = 1
 	n.txn_num = 0
 	n.pending_txns = make(map[int]*Transaction)
-	n.pending_broadcast = make(map[int]bool)
+	n.pending_broadcast = make(map[int]*Transaction)
 	n.no_die = 0
 	n.pending_logs = make(map[int]*Log)
 	n.pending_commits = make(map[int]*Log)
@@ -102,7 +102,7 @@ func (n *Node) Run() {
 			            msgtype := "global_abort" 
 		            	if msg.txn.aborted == false{
 							msgtype = "global_commit"
-							n.pending_broadcast[txn.txnid] = true	//pending to broadcast
+							n.pending_broadcast[txn.txnid] = txn	//pending to broadcast
 						}	
 						txn.dest.messageQ <- Message{msgtype: msgtype, src: n, dest:txn.dest, txn:txn}
 						txn.mod.messageQ <- Message{msgtype: msgtype, src: n, dest:txn.mod, txn:txn}
@@ -129,30 +129,27 @@ func (n *Node) Run() {
 		        	fmt.Printf("[GLOBAL_COMMIT recv] nodeid: %d  txnid: %d  from: %d\n", n.nodeid,msg.txn.txnid,msg.src.nodeid)
 		            
 		          // msgs for oredered broadcast
-		        }else if msg.msgtype == "request_event_log"{
+		        } else if msg.msgtype == "request_event_log"{
 					accept1:=true
 					
 					fmt.Printf("[Request_for_logging_event_recv] nodeid: %d  txnid: %d  from: %d\n", n.nodeid,msg.txn.txnid,msg.src.nodeid)
-					for i, v := range n.pending_broadcast {
-						if(v){							//if pending for broadcast
-							if(i < msg.txn.txnid ){
-								accept1 = false
-								break
-							}else if(i == msg.txn.txnid && n.nodeid < msg.src.nodeid ){
-								accept1 = false
-								break
-							}
-						}else{
-							//should ideally never reach here
-							delete(n.pending_broadcast,i)
+					for i, _ := range n.pending_broadcast {							//if pending for broadcast
+						if(i < msg.txn.txnid ){
+							accept1 = false
+							break
+						}else if(i == msg.txn.txnid && n.nodeid < msg.src.nodeid ){
+							accept1 = false
+							break
 						}
+					
 					}
 					if(accept1){
+						n.max_accepted = msg.txn.txnid
 						msg.src.messageQ <- Message{msgtype: "ack_event_log", src: n, dest: msg.src, txn:msg.txn}
 					}else{
 						n.messageQ <- msg
 					}
-				}else if msg.msgtype == "ack_event_log"{
+				} else if msg.msgtype == "ack_event_log"{
 					fmt.Printf("[Ack_for_logging_event_recv] nodeid: %d  txnid: %d  from: %d\n", n.nodeid,msg.txn.txnid,msg.src.nodeid)
 					
 					// Check if recieved from all live nodes
@@ -180,9 +177,8 @@ func (n *Node) Run() {
 						n.txn_list[n.ledger_entrynum] = *(msg.txn)
 						n.ledger_entrynum++
 						delete(n.pending_logs,msg.txn.txnid)
-						delete(n.pending_broadcast,msg.txn.txnid)
 					}
-				}else if msg.msgtype == "request_commit_log"{
+				} else if msg.msgtype == "request_commit_log" {
 					fmt.Printf("[Request_for_commiting_event_recv] nodeid: %d  txnid: %d  from: %d\n", n.nodeid,msg.txn.txnid,msg.src.nodeid)
 					//Commit the log
 					n.txn_list[n.ledger_entrynum] = *(msg.txn)
@@ -190,7 +186,7 @@ func (n *Node) Run() {
 					// Send ack to the main node
 					msg.src.messageQ <- Message{msgtype: "ack_commit_log", src: n, dest: msg.src, txn:msg.txn}
 					
-				}else if msg.msgtype == "ack_commit_log"{
+				} else if msg.msgtype == "ack_commit_log" {
 					fmt.Printf("[Ack_for_commiting_event_recv] nodeid: %d  txnid: %d  from: %d\n", n.nodeid,msg.txn.txnid,msg.src.nodeid)
 					// Check if recieved by all
 					n.commit_logs[msg.txn.txnid].nodes_recieved[msg.src.nodeid] = true
@@ -206,6 +202,8 @@ func (n *Node) Run() {
 					}
 					if(committed){
 						fmt.Printf("[ALL_ACKS_FOR_COMMITING] nodeid: %d  txnid: %d \n", n.nodeid, msg.txn.txnid)
+						//delete from pending_broadcast only if all have replied committed
+						delete(n.pending_broadcast,msg.txn.txnid)
 						delete(n.commit_logs,msg.txn.txnid)
 					}
 					
@@ -223,6 +221,28 @@ func (n *Node) Run() {
 	    	default:
 				continue
 		}
+
+		//check and broadcast the txn
+		min := 9999999999
+		var txn *Transaction
+		for k,v := range n.pending_broadcast{
+			if(k < min){
+				min = k
+				txn = v
+			}
+		}
+		if(min != 9999999999){
+			
+			n.pending_logs[min] = &(Log{txn: txn, state: "i dont know", nodes_recieved: make(map[int]bool)})
+			
+			for i := 0; i<len(n.node_list); i++ {
+				msg := Message{msgtype: "request_event_log", src: n, dest: &n.node_list[i], txn: txn}
+				n.node_list[i].messageQ <- msg
+			}
+		}
+
+
+
 
 	}
 
@@ -268,8 +288,11 @@ func (n *Node) doTransaction(){
 	amt := rand.Intn(10)		//assume all have infinite money
 
 
+	if(n.txn_num <= n.max_accepted){
+		n.txn_num = n.txn_num + n.max_accepted + 1
+	}
 	//TODO - generate a txn with txnid > max accepted 
-	txn := Transaction{src: n, dest: withNode, mod: modNode, amt:amt, txnid: (n.nodeid + n.max_accepted), 
+	txn := Transaction{src: n, dest: withNode, mod: modNode, amt:amt, txnid: n.txn_num, 
 						num_replies:0, aborted:false, waiting_time: 0}
 	n.pending_txns[txn.txnid] = &txn
 
