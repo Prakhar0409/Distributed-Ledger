@@ -17,6 +17,8 @@ type Node struct {
 	txn_num int
 	pending_txns map[int]*Transaction		//pending to be committed
 	pending_broadcast map[int]bool
+	pending_logs map[int]*Log
+	pending_commits map[int]*Log
 	max_accepted int
 	//set of txns pending to be broadcast
 	// simulator Simulator
@@ -33,6 +35,8 @@ func (n *Node) Initialize(nodeid int, list []Node, maxTxns int, quit chan int){
 	n.pending_txns = make(map[int]*Transaction)
 	n.pending_broadcast = make(map[int]bool)
 	n.no_die = false
+	n.pending_logs = make(map[int]*Log)
+	n.pending_commits = make(map[int]*Log)
 }
 
 func (n *Node) Run() {
@@ -152,11 +156,31 @@ func (n *Node) Run() {
 				}else if msg.msgtype == "ack_event_log"{
 					fmt.Printf("[Ack_for_logging_event_recv] nodeid: %d  txnid: %d  from: %d\n", n.nodeid,msg.txn.txnid,msg.src.nodeid)
 					// Check if recieved by all
+					n.pending_logs[msg.txn.txnid].nodes_recieved[msg.src.nodeid] = true
+					committed :=true
+					for i,v :=  range n.node_list{
+						if(v.Live){
+							k,found = n.pending_logs[msg.txn.txnid].nodes_recieved[v.nodeid]
+							if(!found){
+								committed = false
+								break;
+							}
+						}
+					}
 					
+					if (committed){
+						msg_send:= Message{msgtype: "request_commit_log", src: n, dest: msg.src, txn:msg.txn}
+						delete(n.pending_logs,msg.txnid)
+						// Add to pending_commit
+						for i,v :=  range n.node_list{
+								if(v.Live){
+									v.messageQ <-Q
+								}
+						}
+					}
 				}else if msg.msgtype == "request_commit_log"{
 					fmt.Printf("[Request_for_commiting_event_recv] nodeid: %d  txnid: %d  from: %d\n", n.nodeid,msg.txn.txnid,msg.src.nodeid)
 					//Commit the log
-					
 					
 					// Send ack to the main node
 					msg.src.messageQ <- Message{msgtype: "ack_commit_log", src: n, dest: msg.src, txn:msg.txn}
@@ -164,9 +188,26 @@ func (n *Node) Run() {
 				}else if msg.msgtype == "ack_commit_log"{
 					fmt.Printf("[Ack_for_commiting_event_recv] nodeid: %d  txnid: %d  from: %d\n", n.nodeid,msg.txn.txnid,msg.src.nodeid)
 					// Check if recieved by all
+					n.commit_logs[msg.txn.txnid].nodes_recieved[msg.src.nodeid] = true
+					committed :=true
+					for i,v :=  range n.node_list{
+						if(v.Live){
+							k,found = n.pending_logs[msg.txn.txnid].nodes_recieved[v.nodeid]
+							if(!found){
+								committed = false
+								break;
+							}
+						}
+					}
+					
+					if (committed){
+						delete(n.commit_logs,msg.txnid)
+						delete(n.pending_broadcast,msg.txnid)
+						// Add to pending_commit
+						
+					}
 					
 					// Remove from pending broadcast if recieved by all
-					
 				}else if msg.msgtype == "view_change"{
 					
 					// Update the nodelist accordingly
