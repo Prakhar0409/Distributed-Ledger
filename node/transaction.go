@@ -13,6 +13,9 @@ type Transaction struct{
 	//num-replies received by the src.
 	num_replies int
 	aborted bool
+
+	//waiting time
+	waiting_time int
 }
 
 type Log struct {
