@@ -3,6 +3,8 @@ package node
 import (
 	"fmt"
 	"math/rand"
+    "strconv"
+    "os"
 )
 
 type Node struct {
@@ -52,15 +54,15 @@ func (n *Node) Run() {
 	for{		
 
 		//die with random probability say 2 in 10,0000
-		/*die := rand.Intn(1000000)
+		die := rand.Intn(1000000)
 		if die < 1 && n.no_die == 0 {
 			fmt.Println("DIE: from node:",n.nodeid)
 			n.Live = 0
 			break
-		}*/
+		}
 
-		//do a transaction with random probability say 1 in 10000
-		transact := rand.Intn(10000)
+		//do a transaction with random probability say 1 in 10000000
+		transact := rand.Intn(100000)
 		if transact < 1 {
 			n.no_die++
 			n.doTransaction()
@@ -146,7 +148,10 @@ func (n *Node) Run() {
 					
 					}
 					if(accept1){
-						n.max_accepted = msg.txn.txnid
+						if(n.max_accepted <= msg.txn.txnid){
+							n.max_accepted = msg.txn.txnid
+						}
+						
 						msg.src.messageQ <- Message{msgtype: "ack_event_log", src: n, dest: msg.src, txn:msg.txn}
 					}else{
 						fmt.Printf("Denying ack from nodeid:%d txnid: %d myself: %d\n",msg.src.nodeid,msg.txn.txnid,n.nodeid)
@@ -177,8 +182,8 @@ func (n *Node) Run() {
 									v.messageQ <- msg_send
 								}
 						}
-						n.txn_list[n.ledger_entrynum] = *(msg.txn)
-						n.ledger_entrynum++
+						//n.txn_list[n.ledger_entrynum] = *(msg.txn)
+						//n.ledger_entrynum++
 						n.commit_logs[msg.txn.txnid]=  &(Log{txn: msg.txn, state: "i dont know", nodes_recieved: make(map[int]bool)})
 						//delete(n.pending_logs,msg.txn.txnid)
 					}
@@ -245,19 +250,27 @@ func (n *Node) Run() {
 		if(min != 9999999999){
 			_,found :=n.pending_logs[min]
 			if (!found){
-			n.pending_logs[min] = &(Log{txn: txn, state: "i dont know", nodes_recieved: make(map[int]bool)})
-			for i := 0; i<len(n.node_list); i++ {
-				msg := Message{msgtype: "request_event_log", src: n, dest: &n.node_list[i], txn: txn}
-				n.node_list[i].messageQ <- msg
-			}
+				n.pending_logs[min] = &(Log{txn: txn, state: "i dont know", nodes_recieved: make(map[int]bool)})
+				for i := 0; i<len(n.node_list); i++ {
+					if(n.nodeid == n.node_list[i].nodeid){
+						continue
+					}
+					msg := Message{msgtype: "request_event_log", src: n, dest: &n.node_list[i], txn: txn}
+					n.node_list[i].messageQ <- msg
+				}
 			}
 		}
 
-
-
-
 	}
 
+	fname := "node" + strconv.Itoa(n.nodeid)+ ".txt"
+	f, _ := os.Create(fname)
+
+	for i:=0; i < n.ledger_entrynum; i++{
+		f.WriteString("tid: " + strconv.Itoa(n.txn_list[i].txnid)+"  nodeid: "+strconv.Itoa(n.txn_list[i].src.nodeid) + "\n")
+	}
+
+	defer f.Close()
 
 	//send a exiting signal
 	n.quit <- 1
@@ -301,7 +314,7 @@ func (n *Node) doTransaction(){
 
 
 	if(n.txn_num <= n.max_accepted){
-		n.txn_num = n.txn_num + n.max_accepted + 1
+		n.txn_num = n.max_accepted + 1
 	}
 	//TODO - generate a txn with txnid > max accepted 
 	txn := Transaction{src: n, dest: withNode, mod: modNode, amt:amt, txnid: n.maxTxns*n.nodeid+n.txn_num, 
