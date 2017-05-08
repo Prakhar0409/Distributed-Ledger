@@ -5,6 +5,7 @@ import (
 	"os"
 	"strconv"
 	"github.com/prakhar0409/Distributed-Ledger/node"
+	"reflect"
 )
 
 
@@ -22,10 +23,12 @@ func main(){
         return
     }
 
-    node_list := make([]node.Node, num_nodes)
-   	quit := make(chan int)
+    node_list := make([]node.Node, num_nodes)					//pointer to array
+    fmt.Println(reflect.TypeOf(node_list))
+
+   	quit := make(chan int)										//pointer to channel
 	for i := 0; i < num_nodes; i++ {
-		node_list[i].Initialize(i,node_list,maxTxns,quit);
+		node_list[i].Initialize(i,node_list,maxTxns,quit);		//array, channel, maps are pointers
 		// fmt.Println(node_list[i].nodeid);	//cant refer to unexported field or method
 	}
 

@@ -15,12 +15,13 @@ package node
  11 -> global abort
 */
 type Message struct{
+	
 	msgtype string
-	src Node
-	dest Node
+	src *Node 								//pointer to source node
+	dest *Node 								//pointer to destination node
 
 	//2-phase commit shit
-	txn Transaction
+	txn *Transaction						//pointer to transaction 
 
 	//  join request => type = 1 
 	join_nodeid int
