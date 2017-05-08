@@ -79,6 +79,60 @@ func (n *Node) Run() {
 			}
 		}
 
+		check := rand.Intn(10000)
+		if(check < 1){
+			//check if all ack_event_logs received for any of the txns in pending_logs
+			for tid,log := range n.pending_logs{ 		// k->txnid, log
+				committed := true
+				for _,v :=  range n.node_list{
+					if(v.Live == 1){
+						_,found := n.pending_logs[tid].nodes_recieved[v.nodeid]
+						if(!found && v.nodeid!=n.nodeid){
+							fmt.Printf("Not recieved from nodeid:%d txnid: %d myself: %d\n",v.nodeid,tid,n.nodeid)
+							committed = false
+							break;
+						}
+					}
+				}
+				
+				if (committed){
+					// send to all to commit and add to their ledger
+					for _,v :=  range n.node_list{
+							if(v.Live == 1){
+								msg_send := Message{msgtype: "request_commit_log", src: n, dest: &v, txn: log.txn}
+								v.messageQ <- msg_send
+							}
+					}
+					n.commit_logs[tid]=  &(Log{txn: log.txn, state: "i dont know", nodes_recieved: make(map[int]bool)})
+				}
+			}
+
+			//check if all ack_commit_logs received
+			for tid,log := range n.pending_logs{ 		// k->txnid, log
+				committed := true
+				for _,v :=  range n.node_list{
+					if(v.Live==1){
+						_,found := log.nodes_recieved[v.nodeid]
+						if(!found && v.nodeid!=n.nodeid){
+							committed = false
+							break;
+						}
+					}
+				}
+				if(committed){
+					fmt.Printf("[ALL_ACKS_FOR_COMMITING] nodeid: %d  txnid: %d \n", n.nodeid, tid)
+					//delete from pending_broadcast only if all have replied committed
+					delete(n.pending_broadcast,tid)
+					delete(n.commit_logs,tid)
+					delete(n.pending_logs,tid)
+					fmt.Printf("Successful")
+				}
+				
+			}
+		}
+
+
+
 
 		select {
 			case msg := <- n.messageQ:
@@ -182,8 +236,6 @@ func (n *Node) Run() {
 									v.messageQ <- msg_send
 								}
 						}
-						//n.txn_list[n.ledger_entrynum] = *(msg.txn)
-						//n.ledger_entrynum++
 						n.commit_logs[msg.txn.txnid]=  &(Log{txn: msg.txn, state: "i dont know", nodes_recieved: make(map[int]bool)})
 						//delete(n.pending_logs,msg.txn.txnid)
 					}

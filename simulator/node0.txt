@@ -1,7 +1,0 @@
-tid: 2001  nodeid: 2
-tid: 2003  nodeid: 0
-tid: 4006  nodeid: 2
-tid: 4007  nodeid: 2
-tid: 4008  nodeid: 0
-tid: 4011  nodeid: 0
-tid: 5012  nodeid: 1

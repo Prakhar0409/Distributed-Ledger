@@ -32,7 +32,9 @@ for i in range(1,num_nodes):
 
 	for j in range(0,len(con1)):
 		if con0[j] != con1[j] :
-			print("Panic: longest list till now doesn't match with node"+str(i)+"   line:"+str(j))
+			#print("Panic: longest list till now doesn't match with node"+str(i)+"   line:"+str(j))
+                        print("Semester thuk gaya!")
+                        sys.exit()
 		
 print("Node "+str(longest)+" has longest txn")
 print("Wink! Wink wink!! That ends semester for you babes ;)")
