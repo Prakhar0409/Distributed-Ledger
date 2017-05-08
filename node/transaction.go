@@ -16,6 +16,7 @@ type Transaction struct{
 
 	//waiting time
 	waiting_time int
+	
 }
 
 type Log struct {

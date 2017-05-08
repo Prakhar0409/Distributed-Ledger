@@ -25,6 +25,9 @@ type Node struct {
 	max_accepted int
 	maxTxns int
 	quitsim chan int 					//if simulator calls quit
+	recvd_t [][]int
+	recvd_n [][]int
+	totalsize int
 	//set of txns pending to be broadcast
 	// simulator Simulator
 }
@@ -46,6 +49,16 @@ func (n *Node) Initialize(nodeid int, list []Node, maxTxns int, quit chan int,qu
 	n.commit_logs = make(map[int]*Log)
 	n.maxTxns = maxTxns
 	n.quitsim = quitsim
+	nodesize :=len(list)
+	n.totalsize = nodesize
+	n.recvd_t = make([][]int,nodesize)
+	for i:=range n.recvd_t {
+		n.recvd_t[i] = make([]int,nodesize)
+	}
+	n.recvd_n = make([][]int,nodesize)
+	for i:=range n.recvd_n {
+		n.recvd_n[i] = make([]int,nodesize)
+	}
 }
 
 func (n *Node) Run() {
@@ -73,7 +86,15 @@ func (n *Node) Run() {
 			n.no_die++
 			n.doTransaction()
 		}
-
+		
+		gossip:=rand.Intn(100000)
+		if gossip < 1{
+			k := rand.Intn(n.totalsize)
+			if(n.node_list[k].Live==1 && k!=n.nodeid){
+				msg := Message{msgtype: "gossip_share", src: n, dest: &n.node_list[k], rcvd_t : n.recvd_t ,rcvd_n : n.recvd_n}
+				n.node_list[k].messageQ <- msg
+			}
+		}
 		//check if for any pending transaction - you wait for more than 1,00,00,000 iterations. send a global abort
 		for tid, txn := range n.pending_txns {
 			txn.waiting_time++
@@ -251,6 +272,11 @@ func (n *Node) Run() {
 					n.txn_list[n.ledger_entrynum] = *(msg.txn)
 					n.ledger_entrynum++;
 					// Send ack to the main node
+					if(msg.txn.txnid > n.recvd_t[n.nodeid][n.nodeid]){
+							n.recvd_t[n.nodeid][n.nodeid]= msg.txn.txnid
+						}else if(n.recvd_t[n.nodeid][n.nodeid] == msg.txn.txnid  && n.recvd_n[n.nodeid][n.nodeid] > msg.src.nodeid){
+							n.recvd_n[n.nodeid][n.nodeid] = msg.src.nodeid
+						}
 					msg.src.messageQ <- Message{msgtype: "ack_commit_log", src: n, dest: msg.src, txn:msg.txn}
 					
 				} else if msg.msgtype == "ack_commit_log" {
@@ -275,6 +301,9 @@ func (n *Node) Run() {
 					if(committed){
 						fmt.Printf("[ALL_ACKS_FOR_COMMITING] nodeid: %d  txnid: %d \n", n.nodeid, msg.txn.txnid)
 						//delete from pending_broadcast only if all have replied committed
+						if(msg.txn.txnid > n.recvd_t[n.nodeid][n.nodeid]){
+							n.recvd_t[n.nodeid][n.nodeid]= msg.txn.txnid
+						}
 						delete(n.pending_broadcast,msg.txn.txnid)
 						delete(n.commit_logs,msg.txn.txnid)
 						delete(n.pending_logs,msg.txn.txnid)
@@ -286,8 +315,25 @@ func (n *Node) Run() {
 					
 					// Update the nodelist accordingly
 				}else if msg.msgtype =="request_msg_flushed"{
+					
 					// Update that msg update from that node
 				}else if msg.msgtype =="gossip_share"{
+				fmt.Printf("[Gossip_share] nodeid: %d    from: %d\n", n.nodeid,msg.src.nodeid)
+					for i := 0; i<n.totalsize; i++ {
+						if(n.node_list[i].Live==0){
+							continue
+						}
+						for j := 0; j<n.totalsize; j++{
+							if(n.node_list[j].Live==0){
+							continue
+						}
+							if(msg.rcvd_t[i][j]>n.recvd_t[i][j]){
+								n.recvd_t[i][j] = msg.rcvd_t[i][j]
+							}else if(msg.rcvd_t[i][j]==n.recvd_t[i][j] && msg.rcvd_n[i][j] >n.recvd_n[i][j] ){
+								n.recvd_n[i][j] = msg.rcvd_n[i][j]
+							}
+						}
+					}
 					// Share your matrix with someone else.
 				}else if msg.msgtype =="msg_deliverd" {
 					
