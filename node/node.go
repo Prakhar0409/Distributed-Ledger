@@ -21,6 +21,7 @@ type Node struct {
 	pending_commits map[int]*Log 			// txnid -> Log
 	commit_logs map[int]*Log 			// txnid -> Log
 	max_accepted int
+	maxTxns int
 	//set of txns pending to be broadcast
 	// simulator Simulator
 }
@@ -40,6 +41,7 @@ func (n *Node) Initialize(nodeid int, list []Node, maxTxns int, quit chan int){
 	n.pending_logs = make(map[int]*Log)
 	n.pending_commits = make(map[int]*Log)
 	n.commit_logs = make(map[int]*Log)
+	n.maxTxns = maxTxns
 }
 
 func (n *Node) Run() {
@@ -50,12 +52,12 @@ func (n *Node) Run() {
 	for{		
 
 		//die with random probability say 2 in 10,0000
-		die := rand.Intn(1000000)
+		/*die := rand.Intn(1000000)
 		if die < 1 && n.no_die == 0 {
 			fmt.Println("DIE: from node:",n.nodeid)
 			n.Live = 0
 			break
-		}
+		}*/
 
 		//do a transaction with random probability say 1 in 10000
 		transact := rand.Intn(10000)
@@ -147,6 +149,7 @@ func (n *Node) Run() {
 						n.max_accepted = msg.txn.txnid
 						msg.src.messageQ <- Message{msgtype: "ack_event_log", src: n, dest: msg.src, txn:msg.txn}
 					}else{
+						fmt.Printf("Denying ack from nodeid:%d txnid: %d myself: %d\n",msg.src.nodeid,msg.txn.txnid,n.nodeid)
 						n.messageQ <- msg
 					}
 				} else if msg.msgtype == "ack_event_log"{
@@ -158,7 +161,8 @@ func (n *Node) Run() {
 					for _,v :=  range n.node_list{
 						if(v.Live == 1){
 							_,found := n.pending_logs[msg.txn.txnid].nodes_recieved[v.nodeid]
-							if(!found){
+							if(!found && v.nodeid!=n.nodeid){
+								fmt.Printf("Not recieved from nodeid:%d txnid: %d myself: %d\n",v.nodeid,msg.txn.txnid,n.nodeid)
 								committed = false
 								break;
 							}
@@ -167,7 +171,6 @@ func (n *Node) Run() {
 					
 					if (committed){
 						msg_send := Message{msgtype: "request_commit_log", src: n, dest: msg.src, txn:msg.txn}
-						delete(n.pending_logs, msg.txn.txnid)
 						// send to all to commit and add to their ledger
 						for _,v :=  range n.node_list{
 								if(v.Live == 1){
@@ -176,7 +179,8 @@ func (n *Node) Run() {
 						}
 						n.txn_list[n.ledger_entrynum] = *(msg.txn)
 						n.ledger_entrynum++
-						delete(n.pending_logs,msg.txn.txnid)
+						n.commit_logs[msg.txn.txnid]=  &(Log{txn: msg.txn, state: "i dont know", nodes_recieved: make(map[int]bool)})
+						//delete(n.pending_logs,msg.txn.txnid)
 					}
 				} else if msg.msgtype == "request_commit_log" {
 					fmt.Printf("[Request_for_commiting_event_recv] nodeid: %d  txnid: %d  from: %d\n", n.nodeid,msg.txn.txnid,msg.src.nodeid)
@@ -189,12 +193,17 @@ func (n *Node) Run() {
 				} else if msg.msgtype == "ack_commit_log" {
 					fmt.Printf("[Ack_for_commiting_event_recv] nodeid: %d  txnid: %d  from: %d\n", n.nodeid,msg.txn.txnid,msg.src.nodeid)
 					// Check if recieved by all
-					n.commit_logs[msg.txn.txnid].nodes_recieved[msg.src.nodeid] = true
+					log,found  := n.commit_logs[msg.txn.txnid]
+					if(!found){
+						break
+					}
+						
+					log.nodes_recieved[msg.src.nodeid] = true
 					committed := true
 					for _,v :=  range n.node_list{
 						if(v.Live==1){
-							_,found := n.pending_logs[msg.txn.txnid].nodes_recieved[v.nodeid]
-							if(!found){
+							_,found := log.nodes_recieved[v.nodeid]
+							if(!found && v.nodeid!=n.nodeid){
 								committed = false
 								break;
 							}
@@ -205,6 +214,8 @@ func (n *Node) Run() {
 						//delete from pending_broadcast only if all have replied committed
 						delete(n.pending_broadcast,msg.txn.txnid)
 						delete(n.commit_logs,msg.txn.txnid)
+						delete(n.pending_logs,msg.txn.txnid)
+						fmt.Printf("Successful")
 					}
 					
 					// Remove from pending broadcast if recieved by all
@@ -232,12 +243,13 @@ func (n *Node) Run() {
 			}
 		}
 		if(min != 9999999999){
-			
+			_,found :=n.pending_logs[min]
+			if (!found){
 			n.pending_logs[min] = &(Log{txn: txn, state: "i dont know", nodes_recieved: make(map[int]bool)})
-			
 			for i := 0; i<len(n.node_list); i++ {
 				msg := Message{msgtype: "request_event_log", src: n, dest: &n.node_list[i], txn: txn}
 				n.node_list[i].messageQ <- msg
+			}
 			}
 		}
 
@@ -292,7 +304,7 @@ func (n *Node) doTransaction(){
 		n.txn_num = n.txn_num + n.max_accepted + 1
 	}
 	//TODO - generate a txn with txnid > max accepted 
-	txn := Transaction{src: n, dest: withNode, mod: modNode, amt:amt, txnid: n.txn_num, 
+	txn := Transaction{src: n, dest: withNode, mod: modNode, amt:amt, txnid: n.maxTxns*n.nodeid+n.txn_num, 
 						num_replies:0, aborted:false, waiting_time: 0}
 	n.pending_txns[txn.txnid] = &txn
 

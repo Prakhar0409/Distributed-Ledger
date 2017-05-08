@@ -1,0 +1,30 @@
+[]node.Node
+[HELLO] from node: 4
+[HELLO] from node: 1
+[HELLO] from node: 0
+[HELLO] from node: 3
+[HELLO] from node: 2
+[TXN START] txnid 1   coordinator: 4   destination:  0   moderator:  1
+[VOTE_REQUEST recv] nodeid: 0 txnid: 1  from: 4
+[VOTE_REQUEST recv] nodeid: 1 txnid: 1  from: 4
+[VOTE_COMMIT recv] nodeid: 4 txnid: 1  from: 1
+[VOTE_COMMIT recv] nodeid: 4 txnid: 1  from: 0
+[GLOBAL_COMMIT recv] nodeid: 1  txnid: 1  from: 4
+[Request_for_logging_event_recv] nodeid: 2  txnid: 1  from: 4
+[Request_for_logging_event_recv] nodeid: 1  txnid: 1  from: 4
+[GLOBAL_COMMIT recv] nodeid: 0  txnid: 1  from: 4
+[Request_for_logging_event_recv] nodeid: 0  txnid: 1  from: 4
+[Request_for_logging_event_recv] nodeid: 3  txnid: 1  from: 4
+[Request_for_logging_event_recv] nodeid: 4  txnid: 1  from: 4
+[Ack_for_logging_event_recv] nodeid: 4  txnid: 1  from: 2
+Not recieved from nodeid:0 txnid: 1 myself: 4
+[Ack_for_logging_event_recv] nodeid: 4  txnid: 1  from: 1
+Not recieved from nodeid:0 txnid: 1 myself: 4
+[Ack_for_logging_event_recv] nodeid: 4  txnid: 1  from: 0
+Not recieved from nodeid:3 txnid: 1 myself: 4
+[Ack_for_logging_event_recv] nodeid: 4  txnid: 1  from: 3
+[Request_for_commiting_event_recv] nodeid: 0  txnid: 1  from: 4
+[Request_for_commiting_event_recv] nodeid: 3  txnid: 1  from: 4
+[Request_for_commiting_event_recv] nodeid: 2  txnid: 1  from: 4
+[Ack_for_logging_event_recv] nodeid: 4  txnid: 1  from: 4
+[Request_for_commiting_event_recv] nodeid: 1  txnid: 1  from: 4
