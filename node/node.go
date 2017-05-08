@@ -89,17 +89,6 @@ func (n *Node) Run() {
 				n.node_list[k].messageQ <- msg
 			}
 		}
-		//check if for any pending transaction - you wait for more than 1,00,00,000 iterations. send a global abort
-		for tid, txn := range n.pending_txns {
-			txn.waiting_time++
-			if txn.waiting_time > 10000000{
-				//Timeout and send a global abort.
-				delete(n.pending_txns,tid)
-				txn.dest.messageQ <- Message{msgtype: "global_abort", src: n, dest:txn.dest, txn:txn}
-				txn.mod.messageQ <- Message{msgtype: "global_abort", src: n, dest:txn.mod, txn:txn}
-			}
-		}
-
 		check := rand.Intn(10000)
 		if(check < 1){
 			//check if all ack_event_logs received for any of the txns in pending_logs
@@ -149,6 +138,25 @@ func (n *Node) Run() {
 					fmt.Printf("Successful")
 				}
 				
+			}
+		}
+		
+		view_change :=rand.Intn(1000000)
+		if view_change <1{
+			l:=rand.Intn(n.totalsize)
+			if(n.node_list[l].Live==1 && l!=n.nodeid){
+				n.node_list[l].messageQ <- Message{msgtype: "view_change", src: n, dest: &n.node_list[l]}
+			}
+			
+		}
+		//check if for any pending transaction - you wait for more than 1,00,00,000 iterations. send a global abort
+		for tid, txn := range n.pending_txns {
+			txn.waiting_time++
+			if txn.waiting_time > 10000000{
+				//Timeout and send a global abort.
+				delete(n.pending_txns,tid)
+				txn.dest.messageQ <- Message{msgtype: "global_abort", src: n, dest:txn.dest, txn:txn}
+				txn.mod.messageQ <- Message{msgtype: "global_abort", src: n, dest:txn.mod, txn:txn}
 			}
 		}
 
@@ -306,10 +314,24 @@ func (n *Node) Run() {
 					
 					// Remove from pending broadcast if recieved by all
 				}else if msg.msgtype == "view_change"{
-					
+					fmt.Printf("[View Change] nodeid: %d    from: %d\n", n.nodeid,msg.src.nodeid)
+					for i:=0;i<n.totalsize;i++{
+						if(n.node_list[i].Live==0 || i==n.nodeid){
+							continue
+						}
+						for j := 0; j<n.totalsize; j++{
+							if(n.node_list[j].Live==0 || i==n.nodeid){
+							continue
+						}
+						n.node_list[i].messageQ <-Message{msgtype: "request_msg_flushed", src: n, dest: &n.node_list[i],nnode:j,count:n.recvd_t[n.nodeid][j] }
+						}
+					}
 					// Update the nodelist accordingly
-				}else if msg.msgtype =="request_msg_flushed"{
 					
+				}else if msg.msgtype =="request_msg_flushed"{
+					fmt.Printf("[Msg Flushed] nodeid: %d    from: %d\n", n.nodeid,msg.src.nodeid)
+					n.recvd_t[n.nodeid][msg.nnode] = msg.count
+					msg.src.messageQ <- Message{msgtype: "msg_deliverd", src: n, dest: &n.node_list[msg.src.nodeid],nnode:msg.nnode,count:msg.count }
 					// Update that msg update from that node
 				}else if msg.msgtype =="gossip_share"{
 				fmt.Printf("[Gossip_share] nodeid: %d    from: %d\n", n.nodeid,msg.src.nodeid)
@@ -330,7 +352,8 @@ func (n *Node) Run() {
 					}
 					// Share your matrix with someone else.
 				}else if msg.msgtype =="msg_deliverd" {
-					
+					fmt.Printf("[Msg Delivered] nodeid: %d    from: %d\n", n.nodeid,msg.src.nodeid)
+					n.recvd_t[n.nodeid][msg.nnode] = msg.count
 				}
 	    	default:
 				continue
