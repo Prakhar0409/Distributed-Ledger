@@ -1,5 +1,0 @@
-tid: 5001  nodeid: 5
-tid: 12002  nodeid: 7
-tid: 12003  nodeid: 0
-tid: 30004  nodeid: 18
-tid: 44005  nodeid: 14
