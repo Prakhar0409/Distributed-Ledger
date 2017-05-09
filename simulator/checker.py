@@ -34,7 +34,8 @@ for i in range(1,num_nodes):
 		if con0[j] != con1[j] :
 			#print("Panic: longest list till now doesn't match with node"+str(i)+"   line:"+str(j))
 			#print("oh! Panic Observed Line: ",j," not matched file:",i)
-					
+			pass					
+
 print("Node "+str(longest)+" has longest txn")
 print("Successful")
 sys.exit()
